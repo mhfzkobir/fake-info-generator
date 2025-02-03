@@ -1,95 +1,176 @@
-document.getElementById('generateDataBtn').addEventListener('click', generateData);
+const translations = {
+    en: {
+        "title": "Global Fake Data Generator",
+        "header": "🌍 Global Fake Data Generator",
+        "generate": "Generate Data",
+        "male": "Male",
+        "female": "Female",
+        "random": "Random",
+        "name": "Name",
+        "email": "Email",
+        "address": "Address",
+        "phone": "Phone",
+        "zip": "ZIP Code",
+        "city": "City",
+        "country": "Country"
+    },
+    bn: {
+        "title": "গ্লোবাল ফেইক তথ্য জেনারেটর",
+        "header": "🌍 গ্লোবাল ফেইক তথ্য জেনারেটর",
+        "generate": "তথ্য তৈরি করুন",
+        "male": "পুরুষ",
+        "female": "মহিলা",
+        "random": "এলোমেলো",
+        "name": "নাম",
+        "email": "ইমেইল",
+        "address": "ঠিকানা",
+        "phone": "ফোন",
+        "zip": "জিপ কোড",
+        "city": "শহর",
+        "country": "দেশ"
+    }
+};
+
+// Language handling
+document.getElementById('languageSelect').addEventListener('change', updateLanguage);
+
+function updateLanguage() {
+    const lang = document.getElementById('languageSelect').value;
+    document.body.classList.toggle('bangla-font', lang === 'bn');
+    
+    document.querySelectorAll('[data-i18n]').forEach(element => {
+        const key = element.getAttribute('data-i18n');
+        element.textContent = translations[lang][key];
+    });
+}
+
+// API configuration
+const apiEndpoints = {
+    randomuser: {
+        url: 'https://randomuser.me/api/',
+        parser: (data) => ({
+            name: `${data.results[0].name.first} ${data.results[0].name.last}`,
+            email: data.results[0].email,
+            address: `${data.results[0].location.street.number} ${data.results[0].location.street.name}`,
+            city: data.results[0].location.city,
+            country: data.results[0].location.country,
+            phone: data.results[0].phone,
+            zip: data.results[0].location.postcode
+        })
+    },
+    uinames: {
+        url: 'https://uinames.com/api/',
+        parser: (data) => ({
+            name: `${data.name} ${data.surname}`,
+            email: `${data.name.toLowerCase()}.${data.surname.toLowerCase()}@example.com`,
+            address: `${data.region}, ${data.country}`,
+            city: data.region,
+            country: data.country,
+            phone: `+${Math.floor(1000000000 + Math.random() * 9000000000)}`
+        })
+    },
+    jsonplaceholder: {
+        url: 'https://jsonplaceholder.typicode.com/users/1',
+        parser: (data) => ({
+            name: data.name,
+            email: data.email,
+            address: data.address.street,
+            city: data.address.city,
+            country: data.address.city, // Placeholder limitation
+            phone: data.phone,
+            zip: data.address.zipcode
+        })
+    },
+    randomdata: {
+        url: 'https://random-data-api.com/api/v2/users',
+        parser: (data) => ({
+            name: `${data.first_name} ${data.last_name}`,
+            email: data.email,
+            address: data.address.street_address,
+            city: data.address.city,
+            country: data.address.state,
+            phone: data.phone_number,
+            zip: data.address.zip_code
+        })
+    }
+};
+
+document.getElementById('generateBtn').addEventListener('click', generateData);
 
 async function generateData() {
-    const selectedAPI = document.getElementById('apiSelect').value;
-    const selectedLang = document.getElementById('langSelect').value;
-
-    let data = {};
-
+    const api = document.getElementById('apiSelect').value;
+    const country = document.getElementById('countrySelect').value;
+    const gender = document.getElementById('genderSelect').value;
+    
     showLoader();
-
+    
     try {
-        if (selectedAPI === 'randomUser') {
-            data = await fetchRandomUser();
-        } else if (selectedAPI === 'uiNames') {
-            data = await fetchUINames();
-        } else if (selectedAPI === 'jsonPlaceholder') {
-            data = await fetchJSONPlaceholder();
-        } else if (selectedAPI === 'randomDataAPI') {
-            data = await fetchRandomDataAPI();
+        const apiConfig = apiEndpoints[api];
+        let url = apiConfig.url;
+        
+        // Add parameters based on API
+        if(api === 'randomuser') {
+            url += `?nat=${country.toLowerCase()}&gender=${gender}`;
+        }
+        if(api === 'uinames') {
+            url += `?region=${country}&gender=${gender}`;
         }
 
-        displayData(data, selectedLang);
+        const response = await fetch(url);
+        const data = await response.json();
+        const parsedData = apiConfig.parser(data);
+        
+        displayResults(parsedData);
     } catch (error) {
-        console.error('Error generating data:', error);
-        alert('Failed to generate data. Please try again.');
+        console.error('Error fetching data:', error);
+        alert('Error fetching data. Please try again.');
     } finally {
         hideLoader();
     }
 }
 
-async function fetchRandomUser() {
-    const response = await fetch('https://randomuser.me/api/?nat=us');
-    const { results } = await response.json();
-    return results[0];
-}
-
-async function fetchUINames() {
-    const response = await fetch('https://uinames.com/api/?region=United%20States');
-    return await response.json();
-}
-
-async function fetchJSONPlaceholder() {
-    const response = await fetch('https://jsonplaceholder.typicode.com/users/1');
-    return await response.json();
-}
-
-async function fetchRandomDataAPI() {
-    const response = await fetch('https://random-data-api.com/api/users/random_user');
-    return await response.json();
-}
-
-function displayData(data, lang) {
+function displayResults(data) {
+    const lang = document.getElementById('languageSelect').value;
     const resultDiv = document.getElementById('resultContent');
-    resultDiv.innerHTML = '';
-
-    let name = data.name?.first || data.name || `${data.firstname} ${data.lastname}` || 'N/A';
-    let email = data.email || 'N/A';
-    let address = data.location?.street?.name || data.address || 'N/A';
-
-    if (lang === 'bn') {
-        name = translateToBangla(name);
-        email = translateToBangla(email);
-        address = translateToBangla(address);
-    }
-
+    
     resultDiv.innerHTML = `
         <div class="info-item">
-            <span class="text-muted">${lang === 'bn' ? 'নাম' : 'Name'}:</span> <span>${name}</span>
+            <span class="text-muted">${translations[lang].name}:</span>
+            <span>${data.name}</span>
+            <i class="fas fa-copy copy-icon" onclick="copyText('${data.name}')"></i>
         </div>
         <div class="info-item">
-            <span class="text-muted">${lang === 'bn' ? 'ইমেল' : 'Email'}:</span> <span>${email}</span>
+            <span class="text-muted">${translations[lang].email}:</span>
+            <span>${data.email}</span>
+            <i class="fas fa-copy copy-icon" onclick="copyText('${data.email}')"></i>
         </div>
         <div class="info-item">
-            <span class="text-muted">${lang === 'bn' ? 'ঠিকানা' : 'Address'}:</span> <span>${address}</span>
+            <span class="text-muted">${translations[lang].address}:</span>
+            <span>${data.address}</span>
+            <i class="fas fa-copy copy-icon" onclick="copyText('${data.address}')"></i>
         </div>
+        <div class="info-item">
+            <span class="text-muted">${translations[lang].city}:</span>
+            <span>${data.city}</span>
+            <i class="fas fa-copy copy-icon" onclick="copyText('${data.city}')"></i>
+        </div>
+        <div class="info-item">
+            <span class="text-muted">${translations[lang].country}:</span>
+            <span>${data.country}</span>
+            <i class="fas fa-copy copy-icon" onclick="copyText('${data.country}')"></i>
+        </div>
+        <div class="info-item">
+            <span class="text-muted">${translations[lang].phone}:</span>
+            <span>${data.phone}</span>
+            <i class="fas fa-copy copy-icon" onclick="copyText('${data.phone}')"></i>
+        </div>
+        ${data.zip ? `
+        <div class="info-item">
+            <span class="text-muted">${translations[lang].zip}:</span>
+            <span>${data.zip}</span>
+            <i class="fas fa-copy copy-icon" onclick="copyText('${data.zip}')"></i>
+        </div>` : ''}
     `;
 }
 
-function translateToBangla(text) {
-    const translations = {
-        'N/A': 'তথ্য পাওয়া যায়নি',
-        'Name': 'নাম',
-        'Email': 'ইমেল',
-        'Address': 'ঠিকানা',
-    };
-    return translations[text] || text;
-}
-
-function showLoader() {
-    document.getElementById('loader').classList.remove('d-none');
-}
-
-function hideLoader() {
-    document.getElementById('loader').classList.add('d-none');
-}
+// Keep existing copyText, showLoader, hideLoader functions
